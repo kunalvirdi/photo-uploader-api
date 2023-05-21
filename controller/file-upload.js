@@ -1,6 +1,5 @@
 const FileModel = require("../models/file-model");
-const fs=require('fs')
-const mongoose = require("mongoose");
+const {s3Uploadv2, s3Deletev2} = require("../aws-s3-service");
 
 module.exports.home=(req,res,next)=>{
     res.status(200).json({
@@ -18,30 +17,30 @@ module.exports.getImages=(req,res,next)=>{
     })
 }
 
-module.exports.postImage=(req,res,next)=>{
+module.exports.postImage= async  (req,res,next)=>{
     try{
         if(!req.file){
             res.status(400).json({body:{status:"error",message:"Only jpg,jpeg and png format is allowed..."}})
             throw new Error("Only jpg,jpeg and png format is allowed!");
         }
-        const name=req.file.originalname;
-        const imageUrl=req.file.path;
+        const result = await s3Uploadv2(req.file)
+        const name=result.key
+        const imageUrl=result.Location;
         const creater='6427c501ce7e5e21f4847db6'
         const photo=new FileModel({imageUrl,name,creater});
         photo.save().then(data=>{
-            res.status(202).json({body:{status:"ok",message:"Post uploaded Successfully...",data}});
+            res.status(202).json({body:{status:"ok",message:"Post uploaded Successfully...",result}});
         })
     }catch(e) {
         console.log(e.message);
     }
 }
 
-module.exports.deleteImage=(req,res,next)=>{
+module.exports.deleteImage= async (req,res,next)=>{
     const url=req.body.imageUrl
-    // console.log(url)
-   fs.unlinkSync(url);
+    const name=req.body.name;
     FileModel.deleteOne({imageUrl:url}).then(data=>{
+        s3Deletev2(name)
         res.json({data: data});
     })
-    // next()
 }
